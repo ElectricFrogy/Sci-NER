@@ -24,3 +24,18 @@ python ner_extract.py --in samples/chapters.jsonl --out entities.raw.json --work
 # Smoke tests
 python smoke_tests.py
 ```
+
+## Setup on Windows with existing .venv
+```powershell
+# From PowerShell in project root:
+.\scripts\setup_venv.ps1
+# Or, if you want to force constraints (to avoid builds):
+.\scripts\setup_venv.ps1 -UseConstraints
+```
+
+## Run
+```powershell
+python quotes_extract.py --in samples/chapters.jsonl --out quotes.raw.json --work-slug scifi_sample --determinism-check
+python ner_extract.py    --in samples/chapters.jsonl --out entities.raw.json --work-slug scifi_sample --determinism-check
+python smoke_tests.py
+```
