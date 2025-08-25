@@ -1,11 +1,14 @@
 """Extract named entities from chapters.jsonl into entities.raw.json."""
 import argparse
 import re
-from typing import List, Dict
+from typing import List, Dict, Optional
 
-import spacy
-from spacy.pipeline import EntityRuler
-from spacy.lang.en.stop_words import STOP_WORDS
+try:  # spaCy is optional
+    import spacy
+    from spacy.lang.en.stop_words import STOP_WORDS as SPACY_STOP_WORDS
+except Exception:  # pragma: no cover - runtime dependency
+    spacy = None  # type: ignore
+    SPACY_STOP_WORDS = set()
 
 from utils import (
     set_seed,
@@ -17,6 +20,24 @@ from utils import (
     validate_entity_span,
     deterministic_file_hash,
 )
+
+# Fallback stop words if spaCy isn't installed
+STOP_WORDS = SPACY_STOP_WORDS or {
+    "the",
+    "and",
+    "a",
+    "an",
+    "of",
+    "in",
+    "to",
+    "for",
+    "on",
+    "with",
+    "at",
+    "by",
+    "from",
+    "is",
+}
 
 TECH_PATTERNS = [
   {"label":"TECH","pattern":[{"LOWER":"ftl"}],"id":"ruler"},
@@ -32,10 +53,30 @@ TECH_PATTERNS = [
   {"label":"ORG","pattern":"galactic empire","id":"ruler"},
 ]
 
-def build_nlp():
-    nlp = spacy.load("en_core_web_sm")
+def ensure_spacy_model() -> Optional["spacy.language.Language"]:
+    """Return a loaded spaCy model or a blank pipeline.
+
+    If spaCy or the model is unavailable, return ``None``.
+    """
+    if spacy is None:
+        return None
+    try:
+        nlp = spacy.load("en_core_web_sm")
+    except Exception:
+        nlp = spacy.blank("en")
+        nlp.add_pipe("sentencizer")
     nlp.max_length = 10 ** 7
-    ruler = nlp.add_pipe("entity_ruler", before="ner")
+    return nlp
+
+
+def build_nlp():
+    nlp = ensure_spacy_model()
+    if nlp is None:
+        return None
+    if "ner" in nlp.pipe_names:
+        ruler = nlp.add_pipe("entity_ruler", before="ner")
+    else:
+        ruler = nlp.add_pipe("entity_ruler")
     ruler.add_patterns(TECH_PATTERNS)
     return nlp
 
@@ -54,6 +95,44 @@ def _label_guess(txt: str) -> str:
     if any(w in low for w in ("system", "sector", "quadrant", "nebula", "alpha", "beta", "orion")):
         return "LOC"
     return "ORG"
+
+
+def _cap_fallback_on_text(text: str, chapter_id: int) -> List[Dict]:
+    """Fallback entity extractor based on capitalized spans."""
+    spans: List[Dict] = []
+    tokens = list(re.finditer(r"\b\w+\b", text))
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i].group()
+        if tok[:1].isupper() and tok.isalpha() and tok.lower() not in STOP_WORDS:
+            start = tokens[i].start()
+            j = i + 1
+            while j < len(tokens):
+                gap = text[tokens[j - 1].end(): tokens[j].start()]
+                if re.search(r"[\.\?!\n]", gap):
+                    break
+                t = tokens[j].group()
+                if t.lower() in _LIGHT_MIDDLES or (t[:1].isupper() and t.isalpha()):
+                    j += 1
+                else:
+                    break
+            core = [tokens[k].group() for k in range(i, j) if tokens[k].group().lower() not in _LIGHT_MIDDLES]
+            if len(core) >= 2:
+                end = tokens[j - 1].end()
+                txt = text[start:end]
+                label = _label_guess(txt)
+                spans.append({
+                    "chapter_id": chapter_id,
+                    "start": start,
+                    "end": end,
+                    "text": txt,
+                    "label": label,
+                    "source": "capitalized_fallback",
+                })
+                i = j
+                continue
+        i += 1
+    return spans
 
 
 def extract_capitalized_fallback(doc, chapter_id: int) -> List[Dict]:
@@ -98,20 +177,22 @@ def extract_capitalized_fallback(doc, chapter_id: int) -> List[Dict]:
     return spans
 
 def extract_entities(nlp, text: str, chapter_id: int) -> List[Dict]:
-    doc = nlp(text)
     spans: List[Dict] = []
-    for ent in doc.ents:
-        source = "ruler" if ent.ent_id_ == "ruler" else "spacy"
-        spans.append({
-            "chapter_id": chapter_id,
-            "start": ent.start_char,
-            "end": ent.end_char,
-            "text": ent.text,
-            "label": ent.label_,
-            "source": source,
-        })
-    fallback_spans = extract_capitalized_fallback(doc, chapter_id)
-    spans.extend(fallback_spans)
+    if nlp is not None:
+        doc = nlp(text)
+        for ent in doc.ents:
+            source = "ruler" if ent.ent_id_ == "ruler" else "spacy"
+            spans.append({
+                "chapter_id": chapter_id,
+                "start": ent.start_char,
+                "end": ent.end_char,
+                "text": ent.text,
+                "label": ent.label_,
+                "source": source,
+            })
+        spans.extend(extract_capitalized_fallback(doc, chapter_id))
+    else:
+        spans.extend(_cap_fallback_on_text(text, chapter_id))
     return spans
 
 def run(in_path: str, out_path: str, work_slug: str, dry_run: bool=False):
@@ -155,6 +236,9 @@ def _run_tests():
     )
     norm = normalize_text(text)
     nlp = build_nlp()
+    if nlp is None:
+        print("spaCy unavailable; basic tests skipped")
+        return
     ents = extract_entities(nlp, norm, 1)
     assert any(e["text"] == "HAL 9000" and e["label"] == "PRODUCT" and e["source"] == "ruler" for e in ents)
     assert all("she" not in e["text"].lower() for e in ents)
