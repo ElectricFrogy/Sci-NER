@@ -57,3 +57,29 @@ def ensure_sorted(spans: List[Dict]) -> None:
 def write_json(path: str, data: Dict) -> None:
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2, sort_keys=False)
+
+
+def validate_quote_span(span: Dict) -> None:
+    assert isinstance(span.get("chapter_id"), int)
+    s, e = span.get("start"), span.get("end")
+    assert isinstance(s, int) and isinstance(e, int) and 0 <= s < e
+    assert isinstance(span.get("text"), str)
+    assert span.get("kind") in {"quote", "em_dash_dialogue", "blockquote_guess"}
+    # optional: open/close can be None or str
+    oc = span.get("open_char")
+    cc = span.get("close_char")
+    assert (oc is None or isinstance(oc, str)) and (cc is None or isinstance(cc, str))
+
+
+def validate_entity_span(span: Dict) -> None:
+    assert isinstance(span.get("chapter_id"), int)
+    s, e = span.get("start"), span.get("end")
+    assert isinstance(s, int) and isinstance(e, int) and 0 <= s < e
+    assert isinstance(span.get("text"), str)
+    assert isinstance(span.get("label"), str)
+    assert span.get("source") in {"spacy", "ruler", "capitalized_fallback"}
+
+
+def deterministic_file_hash(path: str) -> str:
+    with open(path, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
