@@ -1,6 +1,4 @@
-import sys
-import time
-
+import sys, time
 
 def main():
     try:
@@ -32,9 +30,9 @@ def main():
         except Exception as e:
             print(f"[model] download failed: {e}")
             time.sleep(2)
+
     print("[model] giving up; runtime will fall back deterministically")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
