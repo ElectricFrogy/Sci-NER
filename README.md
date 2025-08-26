@@ -25,6 +25,25 @@ python ner_extract.py --in samples/chapters.jsonl --out entities.raw.json --work
 python smoke_tests.py
 ```
 
+## Running Tests
+
+```powershell
+python -m pip install -r requirements.txt
+python tests/run_all.py
+```
+
+On first run the command bootstraps `golden/*.golden.json` from `samples/chapters.jsonl`.
+
+If spaCy and its model are unavailable, force the pure-Python NER path:
+
+```powershell
+$env:NER_FORCE_PURE="1"
+python tests/run_all.py
+Remove-Item Env:\NER_FORCE_PURE
+```
+
+Golden comparisons ignore `duration_sec` and any future telemetry fields.
+
 ### Testing notes
 - The NER extractor continues to work without spaCy/model via a deterministic pure-Python fallback.
 - You can force the fallback path during local tests:

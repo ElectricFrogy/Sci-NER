@@ -1,0 +1,59 @@
+{
+  "entities": [
+    {
+      "chapter_id": 1,
+      "end": 21,
+      "label": "PRODUCT",
+      "record_id": "3e27a3cdfabe919b70096997d5b128d6faee0842ed5fcbfd6e34ebd29f719775",
+      "source": "ruler",
+      "start": 13,
+      "text": "HAL 9000"
+    },
+    {
+      "chapter_id": 2,
+      "end": 11,
+      "label": "LAW",
+      "record_id": "d57bff8a55ada70ce579459d6d626c036dcfae38ee517d9fd5e3aaf821146972",
+      "source": "spacy",
+      "start": 1,
+      "text": "Chapter 1”"
+    },
+    {
+      "chapter_id": 2,
+      "end": 39,
+      "label": "ORG",
+      "record_id": "6346c2f896488a996b372c84abff12ac55d65f18e478aedf2a940590e75ee4c8",
+      "source": "capitalized_fallback",
+      "start": 22,
+      "text": "The Spacing Guild"
+    },
+    {
+      "chapter_id": 2,
+      "end": 47,
+      "label": "WORK_OF_ART",
+      "record_id": "1ca07187d056da26c76042d3d6acb34dac49379c4c5476dea998b9116d7261fe",
+      "source": "spacy",
+      "start": 22,
+      "text": "The Spacing Guild\nCouncil"
+    },
+    {
+      "chapter_id": 2,
+      "end": 68,
+      "label": "GPE",
+      "record_id": "d0e3330c83f1a05b5dfe45071c046a90ebc13b46d210c193bc3c5f25f0f6d9bf",
+      "source": "spacy",
+      "start": 53,
+      "text": "Galactic Empire"
+    }
+  ],
+  "normalization_version": "nfc-crlf2lf-v1",
+  "pipeline_version": "0.1.0",
+  "text_hash": {
+    "full_corpus": "5b2242fff678ce7d00a7937da2aa0b4d6e4ae1fdac3e9dbf89ad0644c120dc75",
+    "per_chapter": {
+      "1": "8cb9c4fa162bac045745ae5b48421b81e96021d5c1ac94a11516eac63c596e09",
+      "2": "b0dc061fbb0ddcfc1d742e97de549fac3a95f44bf2e062207255a38acbae80af"
+    }
+  },
+  "work_slug": "sample"
+}

@@ -1,0 +1,64 @@
+{
+  "normalization_version": "nfc-crlf2lf-v1",
+  "pipeline_version": "0.1.0",
+  "quotes": [
+    {
+      "chapter_id": 1,
+      "close_char": "”",
+      "end": 7,
+      "kind": "quote",
+      "open_char": "“",
+      "record_id": "784bc9b4428e011ca1c08630f4967a6a378fdf3355a6d8966d09585d4dbc8ecf",
+      "start": 0,
+      "text": "“Wake,”"
+    },
+    {
+      "chapter_id": 1,
+      "close_char": null,
+      "end": 46,
+      "kind": "em_dash_dialogue",
+      "open_char": null,
+      "record_id": "d4b69861e4ff93e050c083919f13c06bfffeedf645d57e101ec765eca9472064",
+      "start": 23,
+      "text": "— We shouldn’t be here."
+    },
+    {
+      "chapter_id": 1,
+      "close_char": "”",
+      "end": 52,
+      "kind": "quote",
+      "open_char": "“",
+      "record_id": "3f7e702a161bbf4c23b27bba790045a652cc52d2e76530d9b571c29f938eee2d",
+      "start": 47,
+      "text": "“No,”"
+    },
+    {
+      "chapter_id": 1,
+      "close_char": "”",
+      "end": 102,
+      "kind": "quote",
+      "open_char": "“",
+      "record_id": "a7ef73384620cc3514275f63fd472530aa36e3235ec5549a8a3e50a5c9f1743a",
+      "start": 63,
+      "text": "“But listen...\nwe can still turn back.”"
+    },
+    {
+      "chapter_id": 2,
+      "close_char": "”",
+      "end": 21,
+      "kind": "quote",
+      "open_char": "“",
+      "record_id": "cd25d275f2ee726a9b6a8b37944ffd7b2ba7f63797ee4b5df4098e17aca498f3",
+      "start": 13,
+      "text": "“Hello.”"
+    }
+  ],
+  "text_hash": {
+    "full_corpus": "5b2242fff678ce7d00a7937da2aa0b4d6e4ae1fdac3e9dbf89ad0644c120dc75",
+    "per_chapter": {
+      "1": "8cb9c4fa162bac045745ae5b48421b81e96021d5c1ac94a11516eac63c596e09",
+      "2": "b0dc061fbb0ddcfc1d742e97de549fac3a95f44bf2e062207255a38acbae80af"
+    }
+  },
+  "work_slug": "sample"
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["work_slug", "pipeline_version", "normalization_version", "text_hash", "quotes"],
+  "properties": {
+    "work_slug": {"type": "string"},
+    "pipeline_version": {"type": "string"},
+    "normalization_version": {"type": "string"},
+    "text_hash": {
+      "type": "object",
+      "required": ["full_corpus", "per_chapter"],
+      "properties": {
+        "full_corpus": {"type": "string"},
+        "per_chapter": {"type": "object", "additionalProperties": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "quotes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chapter_id", "start", "end", "text", "record_id", "kind"],
+        "properties": {
+          "chapter_id": {"type": "integer"},
+          "start": {"type": "integer"},
+          "end": {"type": "integer"},
+          "text": {"type": "string"},
+          "record_id": {"type": "string"},
+          "kind": {"type": "string"},
+          "source": {"type": "string"},
+          "open_char": {"type": ["string", "null"]},
+          "close_char": {"type": ["string", "null"]}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
