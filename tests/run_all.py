@@ -9,6 +9,7 @@ STAGES = [
     ("crlf", ROOT / "run_crlf_equivalence.py"),
     ("determinism", ROOT / "run_determinism.py"),
     ("schema", ROOT / "run_schema.py"),
+    ("cli_facade", ROOT / "run_cli_facade.py"),
 ]
 
 

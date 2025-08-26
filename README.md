@@ -100,3 +100,35 @@ python quotes_extract.py --in samples/chapters.jsonl --out quotes.raw.json --wor
 python ner_extract.py    --in samples/chapters.jsonl --out entities.raw.json --work-slug scifi_sample --determinism-check
 python smoke_tests.py
 ```
+
+### Unified CLI
+
+```bash
+# Quotes
+python pipeline.py extract quotes --in samples/chapters.jsonl --out quotes.raw.json --work-slug scifi_sample --determinism-check
+
+# Entities
+python pipeline.py extract entities --in samples/chapters.jsonl --out entities.raw.json --work-slug scifi_sample --determinism-check
+
+# Stream to stdout (no file)
+python pipeline.py extract quotes --in samples/chapters.jsonl --work-slug scifi_sample --stdout
+
+# Dry-run (hashes & counts only)
+python pipeline.py dry-run --in samples/chapters.jsonl --work-slug scifi_sample
+```
+
+### Unified CLI
+
+```bash
+# Quotes
+python pipeline.py extract quotes --in samples/chapters.jsonl --out quotes.raw.json --work-slug scifi_sample --determinism-check
+
+# Entities
+python pipeline.py extract entities --in samples/chapters.jsonl --out entities.raw.json --work-slug scifi_sample --determinism-check
+
+# Stream to stdout (no file)
+python pipeline.py extract quotes --in samples/chapters.jsonl --work-slug scifi_sample --stdout
+
+# Dry-run (hashes & counts only)
+python pipeline.py dry-run --in samples/chapters.jsonl --work-slug scifi_sample
+```
