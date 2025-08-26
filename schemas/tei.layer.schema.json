@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "work_slug",
+    "pipeline_version",
+    "normalization_version",
+    "text_hash",
+    "tokenization",
+    "layer",
+    "annotations"
+  ],
+  "properties": {
+    "work_slug": {"type": "string"},
+    "pipeline_version": {"type": "string"},
+    "normalization_version": {"type": "string"},
+    "text_hash": {"type": "object"},
+    "tokenization": {
+      "type": "object",
+      "required": ["algo", "version", "per_chapter"],
+      "properties": {
+        "algo": {"type": "string"},
+        "version": {"type": "string"},
+        "per_chapter": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["count", "sha"],
+            "properties": {
+              "count": {"type": "integer"},
+              "sha": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "layer": {"type": "string"},
+    "annotations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "chapter_id",
+          "token_span",
+          "text",
+          "tag",
+          "source",
+          "record_id"
+        ],
+        "properties": {
+          "chapter_id": {"type": "integer"},
+          "token_span": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {"type": "integer"}
+          },
+          "text": {"type": "string"},
+          "tag": {"type": "string"},
+          "source": {"type": "string"},
+          "record_id": {"type": "string"}
+        }
+      }
+    }
+  }
+}

@@ -10,6 +10,7 @@ STAGES = [
     ("determinism", ROOT / "run_determinism.py"),
     ("schema", ROOT / "run_schema.py"),
     ("cli_facade", ROOT / "run_cli_facade.py"),
+    ("tei", ROOT / "run_tei.py"),
 ]
 
 

@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import tempfile
+import os
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
@@ -34,12 +35,31 @@ def main() -> int:
             q_out = tmp / f"quotes_{tag}.json"
             e_out = tmp / f"entities_{tag}.json"
             subprocess.run(
-                [sys.executable, str(ROOT / "quotes_extract.py"), "--in", str(in_path), "--out", str(q_out), "--work-slug", "sample"],
+                [
+                    sys.executable,
+                    str(ROOT / "quotes_extract.py"),
+                    "--in",
+                    str(in_path),
+                    "--work-slug",
+                    "sample",
+                    "--export-offsets",
+                    str(q_out),
+                ],
                 check=True,
             )
             subprocess.run(
-                [sys.executable, str(ROOT / "ner_extract.py"), "--in", str(in_path), "--out", str(e_out), "--work-slug", "sample"],
+                [
+                    sys.executable,
+                    str(ROOT / "ner_extract.py"),
+                    "--in",
+                    str(in_path),
+                    "--work-slug",
+                    "sample",
+                    "--export-offsets",
+                    str(e_out),
+                ],
                 check=True,
+                env={**os.environ, "NER_FORCE_PURE": "1"},
             )
             q_obj = load_json(q_out)
             e_obj = load_json(e_out)

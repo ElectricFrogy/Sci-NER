@@ -2,6 +2,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import os
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent))
@@ -30,9 +31,20 @@ def main() -> int:
         for key, script in EXTRACTORS:
             out_a = tmp / f"{key}_a.json"
             out_b = tmp / f"{key}_b.json"
-            cmd = [sys.executable, str(script), "--in", str(SAMPLES), "--work-slug", "sample"]
-            subprocess.run(cmd + ["--out", str(out_a)], check=True)
-            subprocess.run(cmd + ["--out", str(out_b)], check=True)
+            cmd = [
+                sys.executable,
+                str(script),
+                "--in",
+                str(SAMPLES),
+                "--work-slug",
+                "sample",
+                "--export-offsets",
+            ]
+            env = os.environ.copy()
+            if key == "entities":
+                env["NER_FORCE_PURE"] = "1"
+            subprocess.run(cmd + [str(out_a)], check=True, env=env)
+            subprocess.run(cmd + [str(out_b)], check=True, env=env)
             h1 = _hash_output(out_a, key)
             h2 = _hash_output(out_b, key)
             if h1 != h2:

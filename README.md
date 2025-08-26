@@ -16,14 +16,23 @@ back to a deterministic capitalized-span heuristic.
 
 ```bash
 # Quotes (deterministic)
-python quotes_extract.py --in samples/chapters.jsonl --out quotes.raw.json --work-slug scifi_sample --determinism-check
+python quotes_extract.py --in samples/chapters.jsonl --work-slug scifi_sample --emit-tei quotes.tei.json --export-offsets quotes.raw.json --determinism-check
 
 # NER (deterministic)
-python ner_extract.py --in samples/chapters.jsonl --out entities.raw.json --work-slug scifi_sample --determinism-check
+python ner_extract.py --in samples/chapters.jsonl --work-slug scifi_sample --emit-tei entities.tei.json --export-offsets entities.raw.json --determinism-check
 
 # Smoke tests
 python smoke_tests.py
 ```
+
+# TEI layer + optional offsets export
+
+```bash
+python pipeline.py extract quotes   --in samples/chapters.jsonl --work-slug scifi_sample --emit-tei quotes.tei.json   --export-offsets quotes.raw.json
+python pipeline.py extract entities --in samples/chapters.jsonl --work-slug scifi_sample --emit-tei entities.tei.json --export-offsets entities.raw.json
+```
+
+The TEI layer is the canonical output and includes per-chapter tokenization metadata. Legacy offset JSON is derived from TEI for Wagtail importers.
 
 ## Running Tests
 
@@ -105,28 +114,12 @@ python smoke_tests.py
 
 ```bash
 # Quotes
-python pipeline.py extract quotes --in samples/chapters.jsonl --out quotes.raw.json --work-slug scifi_sample --determinism-check
+python pipeline.py extract quotes --in samples/chapters.jsonl --work-slug scifi_sample --emit-tei quotes.tei.json --export-offsets quotes.raw.json --determinism-check
 
 # Entities
-python pipeline.py extract entities --in samples/chapters.jsonl --out entities.raw.json --work-slug scifi_sample --determinism-check
+python pipeline.py extract entities --in samples/chapters.jsonl --work-slug scifi_sample --emit-tei entities.tei.json --export-offsets entities.raw.json --determinism-check
 
-# Stream to stdout (no file)
-python pipeline.py extract quotes --in samples/chapters.jsonl --work-slug scifi_sample --stdout
-
-# Dry-run (hashes & counts only)
-python pipeline.py dry-run --in samples/chapters.jsonl --work-slug scifi_sample
-```
-
-### Unified CLI
-
-```bash
-# Quotes
-python pipeline.py extract quotes --in samples/chapters.jsonl --out quotes.raw.json --work-slug scifi_sample --determinism-check
-
-# Entities
-python pipeline.py extract entities --in samples/chapters.jsonl --out entities.raw.json --work-slug scifi_sample --determinism-check
-
-# Stream to stdout (no file)
+# Stream TEI to stdout (no file)
 python pipeline.py extract quotes --in samples/chapters.jsonl --work-slug scifi_sample --stdout
 
 # Dry-run (hashes & counts only)

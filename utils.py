@@ -3,7 +3,7 @@ import json
 import hashlib
 import random
 import unicodedata
-from typing import Iterable, Tuple, Dict, List
+from typing import Iterable, Tuple, Dict, List, Any
 
 try:  # numpy is optional in some environments
     import numpy as np  # type: ignore
@@ -52,6 +52,88 @@ def compute_text_hashes(chapters: List[Tuple[int, str]]) -> Dict[str, Dict[str, 
     per = {str(cid): sha256_hex(text) for cid, text in chapters}
     corpus_concat = "\n".join(text for cid, text in sorted(chapters, key=lambda x: x[0]))
     return {"per_chapter": per, "full_corpus": sha256_hex(corpus_concat)}
+
+TOK_VERSION = "tok-v1"
+
+def tokenize(normalized_text: str) -> List[Dict[str, int | str]]:
+    """Deterministic whitespace/punctuation tokenizer.
+
+    - Contiguous letters/digits form a token.
+    - Each punctuation mark is a standalone token (including em-dash).
+    - Whitespace boundaries are dropped.
+    - Returns 0-based half-open character offsets.
+    """
+    tokens: List[Dict[str, int | str]] = []
+    i = 0
+    n = len(normalized_text)
+    while i < n:
+        ch = normalized_text[i]
+        if ch.isspace():
+            i += 1
+            continue
+        start = i
+        if ch.isalnum():
+            while i < n and normalized_text[i].isalnum():
+                i += 1
+            tokens.append({"text": normalized_text[start:i], "start": start, "end": i})
+        else:
+            tokens.append({"text": ch, "start": start, "end": start + 1})
+            i += 1
+    return tokens
+
+def token_sha(tokens: List[Dict[str, int | str]]) -> str:
+    return sha256_hex("\n".join(str(t["text"]) for t in tokens))
+
+def char_span_to_token_span(tokens: List[Dict[str, int]], start: int, end: int) -> Tuple[int, int]:
+    """Map character offsets to token index span.
+
+    If ``start`` or ``end`` fall inside a token, expand to include that token.
+    ``end`` is half-open.
+    """
+    if start < 0 or end > (tokens[-1]["end"] if tokens else 0):
+        raise ValueError("char span outside tokenized text")
+    t_start = 0
+    while t_start < len(tokens) and tokens[t_start]["end"] <= start:
+        t_start += 1
+    t_end = t_start
+    while t_end < len(tokens) and tokens[t_end]["start"] < end:
+        t_end += 1
+    return t_start, t_end
+
+def token_span_to_char_span(tokens: List[Dict[str, int]], t_start: int, t_end: int) -> Tuple[int, int]:
+    if not (0 <= t_start <= t_end <= len(tokens)):
+        raise ValueError("token span out of range")
+    if t_start == t_end:
+        return 0, 0
+    start = tokens[t_start]["start"]
+    end = tokens[t_end - 1]["end"]
+    return start, end
+
+def build_tei_layer_header(
+    work_slug: str,
+    pipeline_version: str,
+    normalization_version: str,
+    text_hash: Dict[str, Dict[str, str]],
+    layer_name: str,
+    token_meta_per_chapter: Dict[int, Dict[str, str | int]],
+) -> Dict[str, Any]:
+    return {
+        "work_slug": work_slug,
+        "pipeline_version": pipeline_version,
+        "normalization_version": normalization_version,
+        "text_hash": text_hash,
+        "tokenization": {
+            "algo": TOK_VERSION,
+            "version": TOK_VERSION,
+            "per_chapter": {str(k): v for k, v in token_meta_per_chapter.items()},
+        },
+        "layer": layer_name,
+    }
+
+def write_tei(path: str, header_dict: Dict[str, Any], annotations_list: List[Dict[str, Any]]) -> None:
+    obj = dict(header_dict)
+    obj["annotations"] = annotations_list
+    write_json(path, obj)
 
 def ensure_sorted(spans: List[Dict]) -> None:
     spans.sort(key=lambda s: (s["chapter_id"], s["start"], s["end"]))

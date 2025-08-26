@@ -1,24 +1,31 @@
 {
-  "entities": [
+  "annotations": [
     {
       "chapter_id": 2,
-      "end": 39,
-      "label": "ORG",
+      "payload": {},
       "record_id": "6346c2f896488a996b372c84abff12ac55d65f18e478aedf2a940590e75ee4c8",
       "source": "capitalized_fallback",
-      "start": 22,
-      "text": "The Spacing Guild"
+      "tag": "ORG",
+      "text": "The Spacing Guild",
+      "token_span": [
+        8,
+        11
+      ]
     },
     {
       "chapter_id": 2,
-      "end": 68,
-      "label": "ORG",
+      "payload": {},
       "record_id": "e83184bbb8455a806251f42176ae51cbaefe6d35fb99b93b66f324c222ec35d9",
       "source": "capitalized_fallback",
-      "start": 53,
-      "text": "Galactic Empire"
+      "tag": "ORG",
+      "text": "Galactic Empire",
+      "token_span": [
+        14,
+        16
+      ]
     }
   ],
+  "layer": "entities",
   "normalization_version": "nfc-crlf2lf-v1",
   "pipeline_version": "0.1.0",
   "text_hash": {
@@ -27,6 +34,20 @@
       "1": "8cb9c4fa162bac045745ae5b48421b81e96021d5c1ac94a11516eac63c596e09",
       "2": "b0dc061fbb0ddcfc1d742e97de549fac3a95f44bf2e062207255a38acbae80af"
     }
+  },
+  "tokenization": {
+    "algo": "tok-v1",
+    "per_chapter": {
+      "1": {
+        "count": 36,
+        "sha": "76982434572d7245f051aa7c90af4eb7a13b75fb8ac208b10dd355a3f93343c5"
+      },
+      "2": {
+        "count": 16,
+        "sha": "b635ceaf54e63c0c4ef70e4563380783e8429eeb8df41b109ce3c51c1d2750f0"
+      }
+    },
+    "version": "tok-v1"
   },
   "work_slug": "sample"
 }

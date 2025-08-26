@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import tempfile
+import os
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent))
@@ -23,10 +24,20 @@ def main() -> int:
             ("entities", ROOT / "ner_extract.py"),
         ]:
             out_path = tmp / f"{key}.json"
-            subprocess.run(
-                [sys.executable, str(script), "--in", str(SAMPLES), "--out", str(out_path), "--work-slug", "sample"],
-                check=True,
-            )
+            cmd = [
+                sys.executable,
+                str(script),
+                "--in",
+                str(SAMPLES),
+                "--work-slug",
+                "sample",
+                "--export-offsets",
+                str(out_path),
+            ]
+            env = os.environ.copy()
+            if key == "entities":
+                env["NER_FORCE_PURE"] = "1"
+            subprocess.run(cmd, check=True, env=env)
             obj = load_json(out_path)
             stable_sort_spans(obj, key)
             strip_nondeterminism(obj)

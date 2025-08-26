@@ -5,7 +5,7 @@ import argparse
 import re
 import time
 from collections import defaultdict
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 
 from utils import (
     set_seed,
@@ -20,6 +20,12 @@ from utils import (
     make_record_id,
     emit_manifest,
     append_jsonl,
+    tokenize,
+    token_sha,
+    char_span_to_token_span,
+    token_span_to_char_span,
+    build_tei_layer_header,
+    write_tei,
 )
 
 PIPELINE_VERSION = "0.1.0"
@@ -80,7 +86,15 @@ def extract_em_dash_lines(text: str) -> List[Dict]:
         })
     return out
 
-def run(in_path: str, out_path: str, work_slug: str, dry_run: bool = False, **kwargs):
+def run(
+    in_path: str,
+    work_slug: str,
+    *,
+    emit_tei: Optional[str] = None,
+    export_offsets: Optional[str] = None,
+    dry_run: bool = False,
+    **kwargs,
+) -> None:
     t0 = time.perf_counter()
     warns: List[Dict] = []
     chapter_counts: Dict[int, Dict[str, int]] = {}
@@ -88,7 +102,14 @@ def run(in_path: str, out_path: str, work_slug: str, dry_run: bool = False, **kw
     chapters = list(iter_chapters(in_path))
     text_hash = compute_text_hashes(chapters)
     quotes: List[Dict] = []
+    tei_annotations: List[Dict] = []
+    tokens_by_cid: Dict[int, List[Dict]] = {}
+    token_meta: Dict[int, Dict[str, Any]] = {}
+
     for cid, text in chapters:
+        tokens = tokenize(text)
+        tokens_by_cid[cid] = tokens
+        token_meta[cid] = {"count": len(tokens), "sha": token_sha(tokens)}
         q_spans, open_pos = extract_quote_spans(text)
         spans = q_spans + extract_em_dash_lines(text)
         for span in spans:
@@ -102,24 +123,39 @@ def run(in_path: str, out_path: str, work_slug: str, dry_run: bool = False, **kw
                 pipeline_version=PIPELINE_VERSION,
                 normalization_version=NORMALIZATION_VERSION,
             )
-        quotes.extend(spans)
+            quotes.append(span)
+            t_start, t_end = char_span_to_token_span(tokens, span["start"], span["end"])
+            payload = {
+                "open_char": span.get("open_char"),
+                "close_char": span.get("close_char"),
+            }
+            tei_annotations.append(
+                {
+                    "chapter_id": cid,
+                    "token_span": [t_start, t_end],
+                    "text": span["text"],
+                    "tag": span.get("kind", "quote"),
+                    "source": span.get("source", "regex"),
+                    "payload": payload,
+                    "record_id": span["record_id"],
+                }
+            )
         chapter_counts[cid] = {"quotes": len(spans)}
         if open_pos is not None:
-            warns.append({
-                "kind": "unmatched_quote_opener",
-                "chapter_id": cid,
-                "position": int(open_pos),
-                "note": "Opening quote without closing delimiter; dropped span.",
-            })
+            warns.append(
+                {
+                    "kind": "unmatched_quote_opener",
+                    "chapter_id": cid,
+                    "position": int(open_pos),
+                    "note": "Opening quote without closing delimiter; dropped span.",
+                }
+            )
+
     ensure_sorted(quotes)
+    tei_annotations.sort(key=lambda a: (a["chapter_id"], a["token_span"][0], a["token_span"][1]))
     for q in quotes:
         validate_quote_span(q)
-    result = {
-        "work_slug": work_slug,
-        "pipeline_version": PIPELINE_VERSION,
-        "text_hash": text_hash,
-        "quotes": quotes,
-    }
+
     if dry_run:
         counts = defaultdict(int)
         for q in quotes:
@@ -131,26 +167,65 @@ def run(in_path: str, out_path: str, work_slug: str, dry_run: bool = False, **kw
         print("Top 5 longest spans:")
         for span in longest:
             print(span)
-    else:
-        write_json_with_normmeta(out_path, result, NORMALIZATION_VERSION)
-        t1 = time.perf_counter()
-        manifest = {
+        return
+
+    if emit_tei:
+        header = build_tei_layer_header(
+            work_slug,
+            PIPELINE_VERSION,
+            NORMALIZATION_VERSION,
+            text_hash,
+            "quotes",
+            token_meta,
+        )
+        write_tei(emit_tei, header, tei_annotations)
+
+    if export_offsets:
+        legacy: List[Dict] = []
+        for ann in tei_annotations:
+            cid = ann["chapter_id"]
+            start, end = token_span_to_char_span(
+                tokens_by_cid[cid], ann["token_span"][0], ann["token_span"][1]
+            )
+            legacy.append(
+                {
+                    "chapter_id": cid,
+                    "start": start,
+                    "end": end,
+                    "text": ann["text"],
+                    "kind": ann["tag"],
+                    "open_char": ann.get("payload", {}).get("open_char"),
+                    "close_char": ann.get("payload", {}).get("close_char"),
+                    "record_id": ann["record_id"],
+                }
+            )
+        ensure_sorted(legacy)
+        result = {
             "work_slug": work_slug,
             "pipeline_version": PIPELINE_VERSION,
-            "normalization_version": NORMALIZATION_VERSION,
-            "nlp_mode": "regex",
-            "duration_sec": round(t1 - t0, 6),
-            "counts": {
-                "total_quotes": len(quotes),
-                "by_chapter": chapter_counts,
-            },
             "text_hash": text_hash,
+            "quotes": legacy,
         }
-        if kwargs.get("emit_manifest"):
-            emit_manifest(kwargs["emit_manifest"], manifest)
-        if kwargs.get("warns"):
-            for w in warns:
-                append_jsonl(kwargs["warns"], w)
+        write_json_with_normmeta(export_offsets, result, NORMALIZATION_VERSION)
+
+    t1 = time.perf_counter()
+    manifest = {
+        "work_slug": work_slug,
+        "pipeline_version": PIPELINE_VERSION,
+        "normalization_version": NORMALIZATION_VERSION,
+        "nlp_mode": "regex",
+        "duration_sec": round(t1 - t0, 6),
+        "counts": {
+            "total_quotes": len(quotes),
+            "by_chapter": chapter_counts,
+        },
+        "text_hash": text_hash,
+    }
+    if kwargs.get("emit_manifest"):
+        emit_manifest(kwargs["emit_manifest"], manifest)
+    if kwargs.get("warns"):
+        for w in warns:
+            append_jsonl(kwargs["warns"], w)
 
 def _run_tests():
     text = (
@@ -170,8 +245,9 @@ def _run_tests():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="in_path", required=True)
-    ap.add_argument("--out", dest="out_path", required=True)
     ap.add_argument("--work-slug", required=True)
+    ap.add_argument("--emit-tei")
+    ap.add_argument("--export-offsets")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--test", action="store_true")
     ap.add_argument("--determinism-check", action="store_true", help="Run pipeline twice and assert identical output hash")
@@ -181,11 +257,28 @@ def main():
     if args.test:
         _run_tests()
         return
-    run(args.in_path, args.out_path, args.work_slug, args.dry_run, emit_manifest=args.emit_manifest, warns=args.warns)
-    if args.determinism_check and not args.dry_run:
-        h1 = deterministic_file_hash(args.out_path)
-        run(args.in_path, args.out_path, args.work_slug, dry_run=False, emit_manifest=args.emit_manifest, warns=args.warns)
-        h2 = deterministic_file_hash(args.out_path)
+    run(
+        args.in_path,
+        args.work_slug,
+        emit_tei=args.emit_tei,
+        export_offsets=args.export_offsets,
+        dry_run=args.dry_run,
+        emit_manifest=args.emit_manifest,
+        warns=args.warns,
+    )
+    target = args.emit_tei or args.export_offsets
+    if args.determinism_check and not args.dry_run and target:
+        h1 = deterministic_file_hash(target)
+        run(
+            args.in_path,
+            args.work_slug,
+            emit_tei=args.emit_tei,
+            export_offsets=args.export_offsets,
+            dry_run=False,
+            emit_manifest=args.emit_manifest,
+            warns=args.warns,
+        )
+        h2 = deterministic_file_hash(target)
         assert h1 == h2, f"Non-deterministic output: {h1} != {h2}"
 
 if __name__ == "__main__":

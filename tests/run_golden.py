@@ -27,10 +27,21 @@ def main() -> int:
         tmp = Path(td)
         for key, script, golden_name in EXTRACTORS:
             out_path = tmp / f"{key}.json"
-            subprocess.run(
-                [sys.executable, str(script), "--in", str(SAMPLES), "--out", str(out_path), "--work-slug", "sample", "--determinism-check"],
-                check=True,
-            )
+            cmd = [
+                sys.executable,
+                str(script),
+                "--in",
+                str(SAMPLES),
+                "--work-slug",
+                "sample",
+                "--export-offsets",
+                str(out_path),
+                "--determinism-check",
+            ]
+            env = os.environ.copy()
+            if key == "entities":
+                env["NER_FORCE_PURE"] = "1"
+            subprocess.run(cmd, check=True, env=env)
             obj = load_json(out_path)
             stable_sort_spans(obj, key)
             strip_nondeterminism(obj)
