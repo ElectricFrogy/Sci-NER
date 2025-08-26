@@ -83,3 +83,33 @@ def validate_entity_span(span: Dict) -> None:
 def deterministic_file_hash(path: str) -> str:
     with open(path, "rb") as fh:
         return hashlib.sha256(fh.read()).hexdigest()
+
+# === DEDUPE HELPERS (append near end of utils.py) ===
+from typing import List, Dict, Tuple
+
+def _span_key(span: Dict) -> Tuple[int, int, str]:
+    # key insensitive to 'source'; prefer to keep one span per (start,end,text)
+    return (span["start"], span["end"], span["text"])
+
+def dedupe_spans(spans: List[Dict]) -> List[Dict]:
+    """Deterministic de-duplication by (start,end,text).
+    If duplicates exist with different 'source', keep non-fallback over fallback (prefer 'spacy'/'ruler').
+    Preserve original order among distinct keys.
+    """
+    best_by_key = {}
+    order = []
+    for s in spans:
+        k = _span_key(s)
+        if k not in best_by_key:
+            best_by_key[k] = s
+            order.append(k)
+        else:
+            cur = best_by_key[k]
+            # prefer non-fallback if available
+            cur_is_fallback = cur.get("source") == "capitalized_fallback"
+            new_is_fallback = s.get("source") == "capitalized_fallback"
+            if cur_is_fallback and not new_is_fallback:
+                best_by_key[k] = s
+            # else keep existing deterministically
+    return [best_by_key[k] for k in order]
+

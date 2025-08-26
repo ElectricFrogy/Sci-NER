@@ -1,14 +1,13 @@
 """Extract named entities from chapters.jsonl into entities.raw.json."""
 import argparse
+import os
 import re
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 try:  # spaCy is optional
     import spacy
-    from spacy.lang.en.stop_words import STOP_WORDS as SPACY_STOP_WORDS
 except Exception:  # pragma: no cover - runtime dependency
     spacy = None  # type: ignore
-    SPACY_STOP_WORDS = set()
 
 from utils import (
     set_seed,
@@ -19,25 +18,99 @@ from utils import (
     normalize_text,
     validate_entity_span,
     deterministic_file_hash,
+    dedupe_spans,
 )
 
-# Fallback stop words if spaCy isn't installed
-STOP_WORDS = SPACY_STOP_WORDS or {
-    "the",
-    "and",
-    "a",
-    "an",
-    "of",
-    "in",
-    "to",
-    "for",
-    "on",
-    "with",
-    "at",
-    "by",
-    "from",
-    "is",
-}
+_LIGHT_MIDDLES = {"of", "the", "and"}            # allowed internal connectors
+_LEADING_DETS  = {"the", "a", "an"}              # allow as leading determiner
+_HEADING_DENY  = {"Chapter", "Prologue", "Epilogue"}  # optional heading denylist
+_MAX_TOKENS    = 6                                # cap span length to reduce over-merges
+
+def _cap_spans_in_segment(seg: str, base: int, chapter_id: int) -> List[Dict]:
+    """
+    Find capitalized multi-token spans in a *single-line* segment.
+    - Allow an optional leading determiner (The/A/An) without counting it toward core length.
+    - Allow internal 'of/the/and'.
+    - Require ≥2 core capitalized tokens.
+    - Stop at punctuation or end-of-line.
+    - Cap length to _MAX_TOKENS to avoid over-greedy merges.
+    """
+    spans: List[Dict] = []
+    toks = list(re.finditer(r"[A-Za-z]+|\S", seg))
+    i = 0
+    while i < len(toks):
+        tok = toks[i].group(0)
+        s = base + toks[i].start()
+        e = base + toks[i].end()
+
+        # optional leading determiner
+        leading_det = tok.lower() in _LEADING_DETS and tok.istitle()
+        if leading_det and i + 1 < len(toks):
+            nxt = toks[i+1].group(0)
+            nxt_is_cap = nxt[:1].isupper() and nxt.isalpha()
+            if nxt_is_cap:
+                # start from determiner but core starts at next token
+                used: List[Tuple[str,int,int]] = [(tok, s, e)]
+                j = i + 1
+                core_count = 0
+            else:
+                leading_det = False  # treat as normal token below
+
+        if not leading_det:
+            if not (tok[:1].isupper() and tok.isalpha()):
+                i += 1
+                continue
+            used = [(tok, s, e)]
+            j = i + 1
+            core_count = 1
+
+        # aggregate up to MAX_TOKENS
+        while j < len(toks) and len(used) < _MAX_TOKENS:
+            t2 = toks[j].group(0)
+            if t2 in {".", "!", "?", "\n"}:
+                break
+            # allow capitals or light middles
+            if (t2[:1].isupper() and t2.isalpha()) or (t2.lower() in _LIGHT_MIDDLES):
+                used.append((t2, base + toks[j].start(), base + toks[j].end()))
+                if (t2[:1].isupper() and t2.isalpha()) and (t2 not in _HEADING_DENY):
+                    core_count += 1
+                j += 1
+                continue
+            break
+
+        # if we had a leading determiner, ensure there are at least 2 capitalized cores after it
+        min_core = 2 if leading_det else 2
+        # Count core again more explicitly (capitals excluding middles)
+        cores = [t for t,_,__ in used if (t[:1].isupper() and t.isalpha()) and (t.lower() not in _LIGHT_MIDDLES)]
+        if leading_det:
+            # exclude the determiner itself from the core count
+            if cores and cores[0].lower() in _LEADING_DETS:
+                cores = cores[1:]
+
+        if len(cores) >= min_core:
+            span_start, span_end = used[0][1], used[-1][2]
+            txt = seg[(span_start - base):(span_end - base)]
+            # light label heuristic
+            low = txt.lower()
+            if any(w in low for w in ("empire","guild","company","council","ministry","federation","conglomerate")):
+                label = "ORG"
+            elif any(w in low for w in ("system","sector","quadrant","nebula","alpha","beta","orion")):
+                label = "LOC"
+            else:
+                label = "ORG"
+            spans.append({
+                "chapter_id": chapter_id,
+                "start": span_start,
+                "end": span_end,
+                "text": txt,
+                "label": label,
+                "source": "capitalized_fallback",
+            })
+            i = j
+        else:
+            i += 1
+
+    return spans
 
 TECH_PATTERNS = [
   {"label":"TECH","pattern":[{"LOWER":"ftl"}],"id":"ruler"},
@@ -80,103 +153,23 @@ def build_nlp():
     ruler.add_patterns(TECH_PATTERNS)
     return nlp
 
-
-def _good_cap_token(t):
-    return t.text[:1].isupper() and t.is_alpha and t.text.lower() not in STOP_WORDS
-
-
-_LIGHT_MIDDLES = {"of", "the", "and"}
-
-
-def _label_guess(txt: str) -> str:
-    low = txt.lower()
-    if any(w in low for w in ("empire", "guild", "company", "ministry", "consortium", "council")):
-        return "ORG"
-    if any(w in low for w in ("system", "sector", "quadrant", "nebula", "alpha", "beta", "orion")):
-        return "LOC"
-    return "ORG"
-
-
 def _cap_fallback_on_text(text: str, chapter_id: int) -> List[Dict]:
-    """Fallback entity extractor based on capitalized spans."""
     spans: List[Dict] = []
-    tokens = list(re.finditer(r"\b\w+\b", text))
-    i = 0
-    while i < len(tokens):
-        tok = tokens[i].group()
-        if tok[:1].isupper() and tok.isalpha() and tok.lower() not in STOP_WORDS:
-            start = tokens[i].start()
-            j = i + 1
-            while j < len(tokens):
-                gap = text[tokens[j - 1].end(): tokens[j].start()]
-                if re.search(r"[\.\?!\n]", gap):
-                    break
-                t = tokens[j].group()
-                if t.lower() in _LIGHT_MIDDLES or (t[:1].isupper() and t.isalpha()):
-                    j += 1
-                else:
-                    break
-            core = [tokens[k].group() for k in range(i, j) if tokens[k].group().lower() not in _LIGHT_MIDDLES]
-            if len(core) >= 2:
-                end = tokens[j - 1].end()
-                txt = text[start:end]
-                label = _label_guess(txt)
-                spans.append({
-                    "chapter_id": chapter_id,
-                    "start": start,
-                    "end": end,
-                    "text": txt,
-                    "label": label,
-                    "source": "capitalized_fallback",
-                })
-                i = j
-                continue
-        i += 1
-    return spans
-
-
-def extract_capitalized_fallback(doc, chapter_id: int) -> List[Dict]:
-    covered = set()
-    for ent in doc.ents:
-        covered.update(range(ent.start, ent.end))
-    spans = []
-    for sent in doc.sents:
-        i = sent.start
-        while i < sent.end:
-            tok = doc[i]
-            if i in covered or not _good_cap_token(tok):
-                i += 1
-                continue
-            start = i
-            j = i + 1
-            while j < sent.end:
-                t = doc[j]
-                if j in covered or t.text == "\n":
-                    break
-                if _good_cap_token(t) or t.text.lower() in _LIGHT_MIDDLES:
-                    j += 1
-                else:
-                    break
-            core = [t for t in doc[start:j] if t.text.lower() not in _LIGHT_MIDDLES]
-            if len(core) >= 2:
-                span = doc[start:j]
-                txt = span.text
-                label = _label_guess(txt)
-                spans.append({
-                    "chapter_id": chapter_id,
-                    "start": span.start_char,
-                    "end": span.end_char,
-                    "text": txt,
-                    "label": label,
-                    "source": "capitalized_fallback",
-                })
-                covered.update(range(start, j))
-                i = j
-            else:
-                i += 1
+    idx = 0
+    for line in text.splitlines():
+        start = text.find(line, idx)
+        if start < 0:
+            start = idx
+        if line.strip() in _HEADING_DENY:
+            idx = start + len(line) + 1
+            continue
+        spans.extend(_cap_spans_in_segment(line, start, chapter_id))
+        idx = start + len(line) + 1  # skip newline
     return spans
 
 def extract_entities(nlp, text: str, chapter_id: int) -> List[Dict]:
+    if os.getenv("NER_FORCE_PURE") == "1":
+        nlp = None
     spans: List[Dict] = []
     if nlp is not None:
         doc = nlp(text)
@@ -190,9 +183,22 @@ def extract_entities(nlp, text: str, chapter_id: int) -> List[Dict]:
                 "label": ent.label_,
                 "source": source,
             })
-        spans.extend(extract_capitalized_fallback(doc, chapter_id))
+        # line-aware fallback bounded by sentences
+        for sent in getattr(doc, "sents", [doc[:]]):
+            sent_text = text[sent.start_char:sent.end_char]
+            offset = sent.start_char
+            for line in sent_text.splitlines():
+                line_start = text.find(line, offset, sent.end_char)
+                if line_start == -1:
+                    line_start = offset
+                if line.strip() in _HEADING_DENY:
+                    offset = line_start + len(line) + 1
+                    continue
+                spans.extend(_cap_spans_in_segment(line, line_start, chapter_id))
+                offset = line_start + len(line) + 1
     else:
         spans.extend(_cap_fallback_on_text(text, chapter_id))
+    spans = dedupe_spans(spans)
     return spans
 
 def run(in_path: str, out_path: str, work_slug: str, dry_run: bool=False):

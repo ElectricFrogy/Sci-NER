@@ -25,6 +25,14 @@ python ner_extract.py --in samples/chapters.jsonl --out entities.raw.json --work
 python smoke_tests.py
 ```
 
+### Testing notes
+- The NER extractor continues to work without spaCy/model via a deterministic pure-Python fallback.
+- You can force the fallback path during local tests:
+  ```powershell
+  $env:NER_FORCE_PURE="1"
+  python smoke_tests.py
+  ```
+
 ### Windows (PyCharm) — quick setup with existing `.venv`
 
 1. In PyCharm, ensure **Settings → Project → Python Interpreter** points to `.venv`.
