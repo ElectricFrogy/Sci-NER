@@ -19,6 +19,14 @@ from utils import (
 PIPELINE_VERSION = "0.1.0"
 
 
+def _emit_stdout_path(path: str) -> None:
+    with open(path, "rb") as fh:
+        data = fh.read()
+    sys.stdout.buffer.write(data)
+    if not data.endswith(b"\n"):
+        sys.stdout.buffer.write(b"\n")
+
+
 def _run_extract(run_func: Callable[..., Any], args: argparse.Namespace) -> None:
     if args.stdout or not args.out_path:
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
@@ -48,8 +56,7 @@ def _run_extract(run_func: Callable[..., Any], args: argparse.Namespace) -> None
         if h1 != h2:
             raise RuntimeError(f"Non-deterministic output: {h1} != {h2}")
     if args.stdout:
-        with open(out_path, "r", encoding="utf-8") as fh:
-            sys.stdout.write(fh.read())
+        _emit_stdout_path(out_path)
         os.unlink(out_path)
 
 

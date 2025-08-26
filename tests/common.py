@@ -6,8 +6,12 @@ from typing import Any, Dict, List, Tuple
 
 
 def load_json(path: os.PathLike) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except UnicodeDecodeError:
+        with open(path, "r", encoding="utf-8-sig") as fh:
+            return json.load(fh)
 
 
 def stable_sort_spans(obj: Dict[str, Any], key_name: str) -> None:

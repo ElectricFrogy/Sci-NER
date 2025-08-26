@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,17 @@ GOLDEN_DIR = ROOT / "golden"
 
 def _canonical_bytes(obj):
     return json.dumps(obj, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
+
+
+def _run_cli_to_stdout(args, extra_env=None):
+    env = os.environ.copy()
+    if extra_env:
+        env.update(extra_env)
+    cp = subprocess.run(args, capture_output=True, check=True, env=env)
+    tmp = Path(tempfile.gettempdir()) / "cli_stdout.json"
+    with open(tmp, "wb") as fh:
+        fh.write(cp.stdout)
+    return tmp
 
 def _compare(output_path: Path, golden_name: str, key: str) -> int:
     obj = load_json(output_path)
@@ -59,10 +71,10 @@ def main() -> int:
             "--work-slug",
             "sample",
             "--determinism-check",
-        ], check=True)
+        ], check=True, env={**os.environ, "NER_FORCE_PURE": "1"})
         rc |= _compare(e_out, "entities.golden.json", "entities")
 
-        proc = subprocess.run([
+        q_stdout = _run_cli_to_stdout([
             sys.executable,
             str(ROOT / "pipeline.py"),
             "extract",
@@ -72,10 +84,23 @@ def main() -> int:
             "--work-slug",
             "sample",
             "--stdout",
-        ], check=True, stdout=subprocess.PIPE)
-        q_stdout = tmp / "q_stdout.json"
-        q_stdout.write_bytes(proc.stdout)
+            "--determinism-check",
+        ])
         rc |= _compare(q_stdout, "quotes.golden.json", "quotes")
+
+        e_stdout = _run_cli_to_stdout([
+            sys.executable,
+            str(ROOT / "pipeline.py"),
+            "extract",
+            "entities",
+            "--in",
+            str(SAMPLES),
+            "--work-slug",
+            "sample",
+            "--stdout",
+            "--determinism-check",
+        ], extra_env={"NER_FORCE_PURE": "1"})
+        rc |= _compare(e_stdout, "entities.golden.json", "entities")
 
         proc = subprocess.run([
             sys.executable,
