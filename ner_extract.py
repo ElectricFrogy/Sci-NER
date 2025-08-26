@@ -2,6 +2,7 @@
 import argparse
 import os
 import re
+import time
 from typing import List, Dict, Optional, Tuple
 
 try:  # spaCy is optional
@@ -14,12 +15,18 @@ from utils import (
     iter_chapters,
     compute_text_hashes,
     ensure_sorted,
-    write_json,
+    write_json_with_normmeta,
     normalize_text,
     validate_entity_span,
     deterministic_file_hash,
     dedupe_spans,
+    NORMALIZATION_VERSION,
+    make_record_id,
+    emit_manifest,
+    append_jsonl,
 )
+
+PIPELINE_VERSION = "0.1.0"
 
 _LIGHT_MIDDLES = {"of", "the", "and"}            # allowed internal connectors
 _LEADING_DETS  = {"the", "a", "an"}              # allow as leading determiner
@@ -201,21 +208,37 @@ def extract_entities(nlp, text: str, chapter_id: int) -> List[Dict]:
     spans = dedupe_spans(spans)
     return spans
 
-def run(in_path: str, out_path: str, work_slug: str, dry_run: bool=False):
+def run(in_path: str, out_path: str, work_slug: str, dry_run: bool=False, **kwargs):
+    t0 = time.perf_counter()
+    warns: List[Dict] = []
     set_seed()
     nlp = build_nlp()
+    if nlp is None:
+        nlp_mode = "pure"
+    else:
+        nlp_mode = "blank" if set(nlp.pipe_names) == {"sentencizer"} else "spacy"
     chapters = list(iter_chapters(in_path))
-    hashes = compute_text_hashes(chapters)
+    text_hash = compute_text_hashes(chapters)
     entities: List[Dict] = []
     for cid, text in chapters:
         entities.extend(extract_entities(nlp, text, cid))
+    for e in entities:
+        e["record_id"] = make_record_id(
+            chapter_id=e["chapter_id"],
+            start=e["start"],
+            end=e["end"],
+            kind_or_label=e["label"],
+            text=e["text"],
+            pipeline_version=PIPELINE_VERSION,
+            normalization_version=NORMALIZATION_VERSION,
+        )
     ensure_sorted(entities)
     for e in entities:
         validate_entity_span(e)
     result = {
         "work_slug": work_slug,
-        "pipeline_version": "0.1.0",
-        "text_hash": hashes,
+        "pipeline_version": PIPELINE_VERSION,
+        "text_hash": text_hash,
         "entities": entities,
     }
     if dry_run:
@@ -230,7 +253,26 @@ def run(in_path: str, out_path: str, work_slug: str, dry_run: bool=False):
         for span in longest:
             print(span)
     else:
-        write_json(out_path, result)
+        write_json_with_normmeta(out_path, result, NORMALIZATION_VERSION)
+        t1 = time.perf_counter()
+        manifest = {
+            "work_slug": work_slug,
+            "pipeline_version": PIPELINE_VERSION,
+            "normalization_version": NORMALIZATION_VERSION,
+            "nlp_mode": nlp_mode,
+            "duration_sec": round(t1 - t0, 6),
+            "counts": {
+                "total_entities": len(entities),
+                "by_label": {lbl: sum(1 for e in entities if e["label"] == lbl) for lbl in sorted({e["label"] for e in entities})},
+                "by_chapter": {cid: sum(1 for e in entities if e["chapter_id"] == cid) for cid in sorted({e["chapter_id"] for e in entities})},
+            },
+            "text_hash": text_hash,
+        }
+        if kwargs.get("emit_manifest"):
+            emit_manifest(kwargs["emit_manifest"], manifest)
+        if kwargs.get("warns"):
+            for w in warns:
+                append_jsonl(kwargs["warns"], w)
 
 def _run_tests():
     text = (
@@ -258,14 +300,16 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--test", action="store_true")
     ap.add_argument("--determinism-check", action="store_true", help="Run pipeline twice and assert identical output hash")
+    ap.add_argument("--emit-manifest", default=None, help="Path for pipeline.run.json (optional)")
+    ap.add_argument("--warns", default=None, help="Path for errors.warn.jsonl (optional)")
     args = ap.parse_args()
     if args.test:
         _run_tests()
         return
-    run(args.in_path, args.out_path, args.work_slug, args.dry_run)
+    run(args.in_path, args.out_path, args.work_slug, args.dry_run, emit_manifest=args.emit_manifest, warns=args.warns)
     if args.determinism_check and not args.dry_run:
         h1 = deterministic_file_hash(args.out_path)
-        run(args.in_path, args.out_path, args.work_slug, dry_run=False)
+        run(args.in_path, args.out_path, args.work_slug, dry_run=False, emit_manifest=args.emit_manifest, warns=args.warns)
         h2 = deterministic_file_hash(args.out_path)
         assert h1 == h2, f"Non-deterministic output: {h1} != {h2}"
 

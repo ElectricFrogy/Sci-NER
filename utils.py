@@ -11,6 +11,8 @@ except Exception:  # pragma: no cover - fall back if numpy missing
     np = None
 
 FIXED_SEED = 1337
+# === Normalization contract (version your normalization policy) ===
+NORMALIZATION_VERSION = "nfc-crlf2lf-v1"
 
 def set_seed() -> None:
     """Seed random number generators for determinism."""
@@ -112,4 +114,50 @@ def dedupe_spans(spans: List[Dict]) -> List[Dict]:
                 best_by_key[k] = s
             # else keep existing deterministically
     return [best_by_key[k] for k in order]
+
+# === Stable identifiers & writing helpers ===
+import hashlib, json, os, time
+from typing import Dict, List, Tuple, Optional, Any
+
+def _sha256_hex(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+def make_record_id(
+    chapter_id: int,
+    start: int,
+    end: int,
+    kind_or_label: str,
+    text: str,
+    pipeline_version: str,
+    normalization_version: str,
+) -> str:
+    """
+    Stable ID over the normalized text space and span metadata.
+    IMPORTANT: text must be from the normalized chapter string at [start:end].
+    """
+    payload = "\n".join([
+        f"cid={chapter_id}",
+        f"s={start}",
+        f"e={end}",
+        f"k={kind_or_label}",
+        f"txt={text}",
+        f"pver={pipeline_version}",
+        f"nver={normalization_version}",
+    ])
+    return _sha256_hex(payload)
+
+def write_json_with_normmeta(path: str, obj: Dict, normalization_version: str) -> None:
+    obj = dict(obj)  # shallow copy
+    obj.setdefault("normalization_version", normalization_version)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+
+def append_jsonl(path: str, rec: Dict[str, Any]) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+def emit_manifest(path: str, manifest: Dict[str, Any]) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
 
