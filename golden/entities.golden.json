@@ -22,6 +22,7 @@
   "normalization_version": "nfc-crlf2lf-v1",
   "pipeline_version": "0.1.0",
   "text_hash": {
+    "full": "5b2242fff678ce7d00a7937da2aa0b4d6e4ae1fdac3e9dbf89ad0644c120dc75",
     "full_corpus": "5b2242fff678ce7d00a7937da2aa0b4d6e4ae1fdac3e9dbf89ad0644c120dc75",
     "per_chapter": {
       "1": "8cb9c4fa162bac045745ae5b48421b81e96021d5c1ac94a11516eac63c596e09",

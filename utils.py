@@ -13,6 +13,7 @@ except Exception:  # pragma: no cover - fall back if numpy missing
 FIXED_SEED = 1337
 # === Normalization contract (version your normalization policy) ===
 NORMALIZATION_VERSION = "nfc-crlf2lf-v1"
+# text_hash.full_corpus will be removed in a future version; use text_hash.full
 
 def set_seed() -> None:
     """Seed random number generators for determinism."""
@@ -51,7 +52,12 @@ def iter_chapters(path: str) -> Iterable[Tuple[int, str]]:
 def compute_text_hashes(chapters: List[Tuple[int, str]]) -> Dict[str, Dict[str, str]]:
     per = {str(cid): sha256_hex(text) for cid, text in chapters}
     corpus_concat = "\n".join(text for cid, text in sorted(chapters, key=lambda x: x[0]))
-    return {"per_chapter": per, "full_corpus": sha256_hex(corpus_concat)}
+    full_sha = sha256_hex(corpus_concat)
+    return {
+        "per_chapter": per,
+        "full": full_sha,
+        "full_corpus": full_sha,
+    }
 
 TOK_VERSION = "tok-v1"
 

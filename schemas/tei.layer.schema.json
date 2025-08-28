@@ -14,7 +14,10 @@
     "work_slug": {"type": "string"},
     "pipeline_version": {"type": "string"},
     "normalization_version": {"type": "string"},
-    "text_hash": {"type": "object"},
+    "text_hash": {
+      "type": "object",
+      "description": "SHA256 hashes over normalized text; includes canonical 'full' and deprecated 'full_corpus'"
+    },
     "tokenization": {
       "type": "object",
       "required": ["algo", "version", "per_chapter"],

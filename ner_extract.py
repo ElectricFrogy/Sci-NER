@@ -254,6 +254,31 @@ def run(
             )
             entities.append(span)
             t_start, t_end = char_span_to_token_span(tokens, span["start"], span["end"])
+            c_start, c_end = token_span_to_char_span(tokens, t_start, t_end)
+            if c_start != span["start"] or c_end != span["end"]:
+                warns.append(
+                    {
+                        "kind": "entity_token_expanded",
+                        "chapter_id": cid,
+                        "start": span["start"],
+                        "end": span["end"],
+                        "label": span["label"],
+                        "source": span["source"],
+                        "note": "Char span expanded to token boundaries during TEI mapping.",
+                    }
+                )
+            if text[span["start"]:span["end"]] != span["text"]:
+                warns.append(
+                    {
+                        "kind": "entity_text_mismatch",
+                        "chapter_id": cid,
+                        "start": span["start"],
+                        "end": span["end"],
+                        "label": span["label"],
+                        "source": span["source"],
+                        "note": "Span slice does not match span.text; likely normalization drift.",
+                    }
+                )
             tei_annotations.append(
                 {
                     "chapter_id": cid,
@@ -269,6 +294,7 @@ def run(
     tei_annotations.sort(key=lambda a: (a["chapter_id"], a["token_span"][0], a["token_span"][1]))
     for e in entities:
         validate_entity_span(e)
+    warns.sort(key=lambda w: (w["chapter_id"], w["start"], w["end"]))
 
     if dry_run:
         counts = {}

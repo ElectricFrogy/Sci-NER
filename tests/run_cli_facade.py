@@ -143,6 +143,28 @@ def main() -> int:
         ], check=True)
         rc |= _compare(e_off2, "entities.golden.json", "entities")
 
+        bad_tei = tmp / "bad.tei.json"
+        data = load_json(q_tei)
+        data["normalization_version"] = data.get("normalization_version", "") + "-bogus"
+        with open(bad_tei, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+        bad_out = tmp / "bad.json"
+        proc = subprocess.run([
+            sys.executable,
+            str(ROOT / "pipeline.py"),
+            "export",
+            "offsets",
+            "--tei",
+            str(bad_tei),
+            "--out",
+            str(bad_out),
+            "--in",
+            str(SAMPLES),
+        ], capture_output=True, text=True)
+        if proc.returncode == 0 or "normalization_version mismatch" not in proc.stderr:
+            print("Normalization guard failed")
+            rc |= 1
+
         proc = subprocess.run([
             sys.executable,
             str(ROOT / "pipeline.py"),

@@ -11,7 +11,7 @@ sys.path.append(str(TEST_DIR))
 sys.path.append(str(ROOT))
 
 from common import load_json, strip_nondeterminism, try_jsonschema_validate
-from utils import iter_chapters, tokenize, token_span_to_char_span
+from utils import iter_chapters, tokenize, token_span_to_char_span, token_sha
 
 SAMPLES = ROOT / "samples" / "chapters.jsonl"
 GOLDEN_DIR = ROOT / "golden"
@@ -51,8 +51,19 @@ def _compare(path: Path, golden: str) -> int:
         if data != fh.read():
             print(f"Mismatch against {golden}")
             return 1
-    # round-trip check
+    # round-trip & tokenization checks
     chapters = {cid: text for cid, text in iter_chapters(str(SAMPLES))}
+    token_meta = obj.get("tokenization", {}).get("per_chapter", {})
+    chapters_seen = {ann["chapter_id"] for ann in obj.get("annotations", [])}
+    for cid in chapters_seen:
+        meta = token_meta.get(str(cid))
+        if not meta or "count" not in meta or "sha" not in meta:
+            print(f"Missing token metadata for chapter {cid}")
+            return 1
+        tokens = tokenize(chapters[cid])
+        if len(tokens) != meta["count"] or token_sha(tokens) != meta["sha"]:
+            print(f"Token metadata mismatch for chapter {cid}")
+            return 1
     for ann in obj.get("annotations", []):
         tokens = tokenize(chapters[ann["chapter_id"]])
         s, e = token_span_to_char_span(tokens, ann["token_span"][0], ann["token_span"][1])

@@ -112,6 +112,12 @@ def _cmd_dry_run(args: argparse.Namespace) -> None:
 def _cmd_export_offsets(args: argparse.Namespace) -> None:
     with open(args.tei, "r", encoding="utf-8") as fh:
         tei = json.load(fh)
+    tei_norm = tei.get("normalization_version")
+    if tei_norm != NORMALIZATION_VERSION:
+        raise RuntimeError(
+            f"normalization_version mismatch: TEI={tei_norm}, pipeline={NORMALIZATION_VERSION}\n"
+            "Refuse to export offsets to prevent stale spans. Re-run pipeline with matching normalization."
+        )
     layer = tei.get("layer")
     chapters = {cid: text for cid, text in iter_chapters(args.in_path)}
     token_meta = tei.get("tokenization", {}).get("per_chapter", {})

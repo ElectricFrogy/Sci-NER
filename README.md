@@ -34,6 +34,13 @@ python pipeline.py extract entities --in samples/chapters.jsonl --work-slug scif
 
 The TEI layer is the canonical output and includes per-chapter tokenization metadata. Legacy offset JSON is derived from TEI for Wagtail importers.
 
+`text_hash.full` is the canonical whole-corpus hash; `text_hash.full_corpus` is
+retained temporarily for backward compatibility and will be removed in a future
+release.
+
+`pipeline.py export offsets` refuses to run when the TEI file's
+`normalization_version` differs from the pipeline's expected value.
+
 ## Running Tests
 
 ```powershell

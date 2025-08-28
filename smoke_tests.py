@@ -45,3 +45,5 @@ if __name__ == "__main__":
     test_quotes()
     test_ner_fallback()
     print("Smoke tests passed.")
+
+
