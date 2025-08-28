@@ -1,0 +1,25 @@
+# Windows + Python 3.13 pinned wheels for spaCy 3.8.x stack
+# Keep in sync with requirements.txt upper bounds.
+
+spacy==3.8.7
+thinc==8.3.6
+numpy==2.1.3
+
+# spaCy subdeps with cp313 wheels
+blis==1.3.0
+cymem==2.0.20
+preshed==3.0.10
+murmurhash==1.0.13
+srsly==2.5.1
+catalogue==2.0.10
+weasel==0.4.1
+langcodes==3.5.0
+wasabi==1.1.3
+tqdm==4.67.1
+typer==0.16.1
+requests==2.32.5
+jinja2==3.1.6
+spacy-legacy==3.0.12
+spacy-loggers==1.0.5
+cloudpathlib==0.21.1
+smart-open==7.3.0.post1

@@ -1,6 +1,6 @@
 # Setup
 
-This project targets **Python 3.11**. Create a virtual environment and install
+This project targets **Python 3.11** and **3.13**. Create a virtual environment and install
 dependencies:
 
 ```bash
@@ -8,6 +8,16 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
+
+### Supported Python versions & Windows constraints
+
+| Python | Constraints file                | Install command (Windows)                                                                                 |
+|--------|----------------------------------|------------------------------------------------------------------------------------------------------------|
+| 3.11   | constraints-windows-py311.txt    | `python -m pip install -r requirements.txt -c constraints-windows-py311.txt --only-binary=:all: --prefer-binary` |
+| 3.13   | constraints-windows-py313.txt    | `python -m pip install -r requirements.txt -c constraints-windows-py313.txt --only-binary=:all: --prefer-binary` |
+
+> Tip: `.\scripts\setup_venv.ps1 -UseConstraints` auto-selects the right constraints based on your venv’s Python.
+> Entities tests run in PURE mode by default (`NER_FORCE_PURE=1`), so the spaCy model is optional for the suite.
 
 If `spaCy` or the `en_core_web_sm` model are missing, the NER extractor falls
 back to a deterministic capitalized-span heuristic.

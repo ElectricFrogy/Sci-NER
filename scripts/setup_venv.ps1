@@ -1,4 +1,6 @@
-param([switch]$UseConstraints)
+param(
+  [switch]$UseConstraints
+)
 
 # 1) Activate existing venv
 $activate = ".\.venv\Scripts\Activate.ps1"
@@ -7,18 +9,37 @@ if (-Not (Test-Path $activate)) {
   exit 1
 }
 . $activate
+$venvPython = (Get-Command python).Source
 
-# 2) Upgrade packaging tooling (quoted, wheels preferred later)
-python -m pip install --upgrade pip setuptools wheel
-
-# 3) Install deps with wheels-first policy; optionally apply constraints
+# Choose constraints if requested
+$constraints = $null
 if ($UseConstraints) {
-  python -m pip install --only-binary=:all: --prefer-binary -r requirements.txt -c constraints-windows-py311.txt
-} else {
-  python -m pip install --only-binary=:all: --prefer-binary -r requirements.txt
+  $pyVer = & $venvPython -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+  if ($pyVer -eq '3.11') {
+    $constraints = 'constraints-windows-py311.txt'
+  } elseif ($pyVer -eq '3.13') {
+    $constraints = 'constraints-windows-py313.txt'
+  } else {
+    Write-Error "Unsupported Python version: $pyVer. Use 3.11 or 3.13 on Windows."
+    exit 1
+  }
 }
 
-# 4) Try to fetch en_core_web_sm; safe to skip offline
-python scripts\install_spacy_model.py
+# Upgrade tooling
+& $venvPython -m pip install -U pip setuptools wheel
+
+# Install deps with wheels-first policy
+if ($constraints) {
+  & $venvPython -m pip install -r requirements.txt -c $constraints --only-binary=:all: --prefer-binary
+} else {
+  & $venvPython -m pip install -r requirements.txt --only-binary=:all: --prefer-binary
+}
+
+# Optional: attempt model download (do not fail if it can't)
+try {
+  & $venvPython scripts\install_spacy_model.py
+} catch {
+  Write-Host "Skipping spaCy model download (optional)."
+}
 
 Write-Host "[setup] done"
